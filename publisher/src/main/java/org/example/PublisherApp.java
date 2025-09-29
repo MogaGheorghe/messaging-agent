@@ -1,7 +1,9 @@
 package org.example;
+
 import java.util.Scanner;
 
 public class PublisherApp {
+
     public static void main(String[] args) {
         System.out.println("PublisherApp started");
 
@@ -12,8 +14,9 @@ public class PublisherApp {
             );
 
             Scanner scanner = new Scanner(System.in);
-            System.out.print("Enter your name: ");
+            System.out.print("Enter the topic: ");
             String sender = scanner.nextLine();
+
 
             while (true) {
                 System.out.print("Message (or 'exit' to quit): ");
@@ -23,9 +26,13 @@ public class PublisherApp {
                 Payload payload = new Payload(sender, message);
                 publisher.send(payload);
 
-                // Receive broker's reply (for now, just echo)
+                // Receive broker's reply
                 Object reply = publisher.receive();
                 System.out.println("Broker reply: " + reply);
+
+                // Serializare în JSON
+                byte[] data = PublisherSocket.serializeToJson(payload);
+                publisher.sendBytes(data);
             }
 
             publisher.close();
