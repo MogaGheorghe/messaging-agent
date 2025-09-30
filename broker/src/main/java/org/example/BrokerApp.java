@@ -1,7 +1,5 @@
 package org.example;
 
-
-
 public class BrokerApp {
     public static void main(String[] args) {
         System.out.println("BrokerApp started");
