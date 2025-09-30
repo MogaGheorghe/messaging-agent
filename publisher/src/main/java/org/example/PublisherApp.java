@@ -1,6 +1,7 @@
 package org.example;
 
 import java.util.Scanner;
+import java.net.*;
 
 public class PublisherApp {
 
@@ -40,6 +41,9 @@ public class PublisherApp {
             }
 
             publisher.close();
+        } catch (ConnectException e) {
+            System.out.println("Unable to connect to broker. Check if it is turned on " +
+                    Settings.BROKER_IP + ":" + Settings.BROKER_PORT);
         } catch (Exception e) {
             e.printStackTrace();
         }
