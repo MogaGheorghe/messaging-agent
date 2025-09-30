@@ -1,12 +1,7 @@
 package org.example;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 
 public class SubscriberSocket {
@@ -15,83 +10,73 @@ public class SubscriberSocket {
 
     public SubscriberSocket(String topic) {
         this.topic = topic;
-        this.socket = new Socket();
+        try {
+            this.socket = new Socket(InetAddress.getByName("localhost"), Settings.BROKER_PORT);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void connect(String ipAddress, int port) {
         new Thread(() -> {
             try {
-                socket.connect(new InetSocketAddress(ipAddress, port));
-                System.out.println("Waiting for a connection...");
+                if (socket == null || socket.isClosed()) {
+                    socket.connect(new InetSocketAddress(ipAddress, port));
+                }
                 connectedCallback();
             } catch (IOException e) {
-                System.out.println("Error: Subscriber could not connect to broker. " + e.getMessage());
+                System.out.println("Error: Subscriber connection failed.");
+                e.printStackTrace();
             }
         }).start();
+
+        System.out.println("Waiting for a connection");
     }
 
     private void connectedCallback() {
         if (socket.isConnected()) {
             System.out.println("Subscriber connected to broker.");
-            subscribe();
-            startReceive();
+            Subscribe();
+            StartReceive();
         } else {
-            System.out.println("Error: Subscriber could not connect to broker.");
+            System.out.println("Error: Subscriber not connected.");
         }
     }
 
-    private void subscribe() {
-        String msg = "subscribe#" + topic;
-        byte[] data = msg.getBytes(StandardCharsets.UTF_8);
-        send(data);
-    }
-
-    private void send(byte[] data) {
+    private void Subscribe() {
         try {
-            socket.getOutputStream().write(data);
-            socket.getOutputStream().flush();
+            PrintWriter out = new PrintWriter(
+                    new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8),
+                    true
+            );
+            out.println("subscribe#" + topic); // cu newline
+            System.out.println("Sent subscribe request for topic: " + topic);
         } catch (IOException e) {
-            System.out.println("Could not send data: " + e.getMessage());
+            System.out.println("Could not send subscribe request: " + e.getMessage());
         }
     }
 
-    private void startReceive() {
+    private void StartReceive() {
         ConnectionInfo connection = new ConnectionInfo();
-        connection.setSocket(socket);
-        new Thread(() -> receiveLoop(connection)).start();
+        connection.Socket = socket;
+        new Thread(() -> receiveCallback(connection)).start();
     }
 
-
-    private void receiveLoop(ConnectionInfo connection) {
-        try (BufferedReader in = new BufferedReader(
-                new InputStreamReader(connection.getSocket().getInputStream(), StandardCharsets.UTF_8))) {
-
+    private void receiveCallback(ConnectionInfo connection) {
+        try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getSocket().getInputStream(), StandardCharsets.UTF_8));
             String line;
             while ((line = in.readLine()) != null) {
-                Payload payload = new ObjectMapper().readValue(line, Payload.class);
-                System.out.println("Subscriber received: " + payload.getMessage());
+                Payload payload = new com.fasterxml.jackson.databind.ObjectMapper().readValue(line, Payload.class);
+                System.out.println("Received message: " + payload);
             }
-        } catch (IOException e) {
-            System.out.println("Can't receive data from broker: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Can't receive data from broker. " + e.getMessage());
+            try {
+                connection.getSocket().close();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
-//    private void receiveLoop(ConnectionInfo connection) {
-//        try {
-//            while (true) {
-//                int read = connection.getSocket().getInputStream().read(connection.getData());
-//                if (read == -1) break;
-//
-//                byte[] payloadBytes = new byte[read];
-//                System.arraycopy(connection.getData(), 0, payloadBytes, 0, read);
-//
-//                PayloadHandler.Handle(payloadBytes);
-//            }
-//        } catch (IOException e) {
-//            System.out.println("Can't receive data from broker: " + e.getMessage());
-//        } finally {
-//            try {
-//                connection.getSocket().close();
-//            } catch (IOException ignored) {}
-//        }
-//    }
 }

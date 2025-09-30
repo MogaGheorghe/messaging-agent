@@ -1,18 +1,16 @@
 package org.example;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 public class PayloadHandler {
-    private static final ObjectMapper mapper = new ObjectMapper();
-
-    public static void Handle(byte[] payloadBytes) {
+    public static void handle(byte[] payloadBytes) {
         try {
             String payloadString = new String(payloadBytes, StandardCharsets.UTF_8);
+            ObjectMapper mapper = new ObjectMapper();
             Payload payload = mapper.readValue(payloadString, Payload.class);
             System.out.println(payload.getMessage());
-        } catch (IOException e) {
-            System.out.println("Error deserializing payload: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

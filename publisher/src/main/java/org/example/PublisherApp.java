@@ -14,25 +14,29 @@ public class PublisherApp {
             );
 
             Scanner scanner = new Scanner(System.in);
-            System.out.print("Enter the topic: ");
-            String sender = scanner.nextLine();
-
 
             while (true) {
+                // Aleg topicul
+                System.out.print("Enter the topic (or 'exit' to quit): ");
+                String topic = scanner.nextLine();
+                if (topic.equalsIgnoreCase("exit")) break;
+
+                // Scriu mesajul
                 System.out.print("Message (or 'exit' to quit): ");
                 String message = scanner.nextLine();
                 if (message.equalsIgnoreCase("exit")) break;
 
-                Payload payload = new Payload(sender, message);
+                // Construiesc payload
+                Payload payload = new Payload(topic, message);
                 publisher.send(payload);
 
-                // Receive broker's reply
-                Object reply = publisher.receive();
-                System.out.println("Broker reply: " + reply);
-
-                // Serializare în JSON
-                byte[] data = PublisherSocket.serializeToJson(payload);
-                publisher.sendBytes(data);
+                // Primim răspunsul broker-ului
+//                Payload reply = publisher.receive();
+//                System.out.println("Broker reply: " + reply);
+//
+//                // Serializare în JSON
+//                byte[] data = PublisherSocket.serializeToJson(payload);
+//                publisher.sendBytes(data);
             }
 
             publisher.close();

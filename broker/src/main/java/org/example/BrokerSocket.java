@@ -5,9 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BrokerSocket {
-    private final ServerSocket  _socket;
+    private final ServerSocket _socket;
+    private final List<ConnectionInfo> connections = new ArrayList<>();
 
     public BrokerSocket(String ip, int port, int maxConnections) throws IOException {
         _socket = new ServerSocket(port, maxConnections, InetAddress.getByName(ip));
@@ -26,6 +29,10 @@ public class BrokerSocket {
                 ConnectionInfo connection = new ConnectionInfo();
                 connection.setSocket(clientSocket);
                 connection.setAddress(clientSocket.getInetAddress().toString());
+
+                synchronized (connections) {
+                    connections.add(connection);
+                }
 
                 System.out.println("Client connected: " + connection.getAddress());
 
@@ -46,34 +53,44 @@ public class BrokerSocket {
             ObjectMapper mapper = new ObjectMapper();
 
             while ((line = in.readLine()) != null) {
-                Payload payload = mapper.readValue(line, Payload.class);
-                System.out.println("[" + connection.getAddress() + "] " + payload);
+                // SUBSCRIBE
+                if (line.startsWith("subscribe#")) {
+                    String topic = line.split("#")[1];
+                    connection.setTopic(topic);
+                    System.out.println("[" + connection.getAddress() + "] subscribed to topic: " + topic);
+                }
+                // PAYLOAD de la Publisher
+                else if (line.startsWith("{")) {
+                    Payload payload = mapper.readValue(line, Payload.class);
+                    System.out.println("[" + connection.getAddress() + "] published: " + payload);
+                    sendToSubscribers(payload);
+                }
             }
+
             System.out.println("Client disconnected: " + connection.getAddress());
         } catch (IOException e) {
             System.out.println("Error in HandleClient: " + e.getMessage());
         }
     }
-//    private void HandleClient(ConnectionInfo connection) {
-//        try (ObjectInputStream in = new ObjectInputStream(connection.getSocket().getInputStream());
-//             ObjectOutputStream out = new ObjectOutputStream(connection.getSocket().getOutputStream())) {
-//
-//            Object obj;
-//            while ((obj = in.readObject()) != null) {
-//                if (obj instanceof Payload payload) {
-//                    System.out.println("[" + connection.getAddress() + "] " + payload);
-//
-//                    // trimitem payload către grupul multicast
-//                    // sendToSubscribers(payload);
-//                }
-//            }
-//
-//            System.out.println("Client disconnected: " + connection.getAddress());
-//
-//        } catch (IOException | ClassNotFoundException e) {
-//            e.printStackTrace();
-//        }
-//    }
+
+    private void sendToSubscribers(Payload payload) {
+        synchronized (connections) {
+            for (ConnectionInfo conn : connections) {
+                if (conn.getTopic() != null && conn.getTopic().equalsIgnoreCase(payload.getSender())) {
+                    try {
+                        PrintWriter out = new PrintWriter(
+                                new OutputStreamWriter(conn.getSocket().getOutputStream(), StandardCharsets.UTF_8),
+                                true
+                        );
+                        out.println(new ObjectMapper().writeValueAsString(payload));
+                        System.out.println("Sent to subscriber [" + conn.getAddress() + "] " + payload);
+                    } catch (IOException e) {
+                        System.out.println("Failed to send to " + conn.getAddress() + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
 
     public void Close() throws IOException {
         if (_socket != null && !_socket.isClosed()) {
@@ -81,24 +98,4 @@ public class BrokerSocket {
             System.out.println("Broker stopped.");
         }
     }
-
-//    private void sendToSubscribers(Payload payload) {
-//        try {
-//            InetAddress group = InetAddress.getByName("224.0.0.224");
-//            int port = Settings.BROKER_PORT;
-//
-//            byte[] data = payload.toString().getBytes("UTF-16");
-//
-//            DatagramPacket packet = new DatagramPacket(data, data.length, group, port);
-//
-//            try (DatagramSocket datagramSocket = new DatagramSocket()) {
-//                datagramSocket.send(packet);
-//            }
-//
-//            System.out.println("Payload multicast to subscribers: " + payload);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-
 }
