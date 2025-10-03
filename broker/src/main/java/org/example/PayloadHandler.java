@@ -3,34 +3,31 @@ package org.example;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 public class PayloadHandler {
-    public static void Handle(byte[] payload, ConnectionInfo connection) {
 
-        String payloadString = new String(payload);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
-        if (payloadString.startsWith("#subscribe")) {
-            connection.setTopic(payloadString.split("#subscribe")[1]);
-            //adaugam conexiunea in storage
-            ConnectionsStorage.Add(connection);
-            System.out.println("Subscribed to topic");
-        }
-        else
-        {
-            System.out.printf("[%s] Payload: %s%n", connection.getAddress(), payloadString);
-            ObjectMapper mapper = new ObjectMapper();
-            try {
-                Payload p = mapper.readValue(payloadString, Payload.class);
-                System.out.println("Parsed subject: " + p.getSubject());
-                PayloadStorage.Add(p);
-            } catch (IOException e) {
-                System.out.printf("[%s] Invalid JSON: %s%n", connection.getAddress(), e.getMessage());
+    public static void Handle(byte[] payloadBytes, ConnectionInfo connection) {
+        String payloadString = new String(payloadBytes, StandardCharsets.UTF_8).trim();
+
+        try {
+            if (payloadString.startsWith("subscribe#")) {
+                String topic = payloadString.split("#", 2)[1].trim();
+                connection.setTopic(topic);
+
+                ConnectionsStorage.Add(connection);
+                System.out.printf("[%s] Subscribed to topic: %s%n", connection.getAddress(), topic);
+                return;
             }
+            Payload payload = mapper.readValue(payloadString, Payload.class);
+            System.out.printf("[%s] Published payload: %s%n", connection.getAddress(), payload);
 
+            PayloadStorage.Add(payload);
 
-
+        } catch (IOException e) {
+            System.out.printf("[%s] Invalid message format: %s%n", connection.getAddress(), payloadString);
         }
-
-
     }
 }

@@ -19,16 +19,14 @@ public class Worker {
                     List<ConnectionInfo> connections = ConnectionsStorage.GetConnectionsBySubject(payload.getSubject());
                     for (ConnectionInfo connection : connections) {
                         try {
-                            // Serialize payload to JSON
                             ObjectMapper mapper = new ObjectMapper();
                             String payloadString = mapper.writeValueAsString(payload);
 
-                            // Convert to bytes (UTF-8 encoding)
+
                             byte[] data = payloadString.getBytes(StandardCharsets.UTF_8);
 
-                            // Send to client
                             OutputStream out = connection.getSocket().getOutputStream();
-                            out.write(data);
+                            out.write((payloadString + "\n").getBytes(StandardCharsets.UTF_8));
                             out.flush();
 
                         } catch (Exception e) {
