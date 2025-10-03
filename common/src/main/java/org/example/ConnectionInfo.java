@@ -2,12 +2,13 @@ package org.example;
 
 import java.net.Socket;
 
+import static org.example.Settings.BUFFER_SIZE;
+
 public class ConnectionInfo {
-    public final int BUFFER_SIZE = 1024;
     public byte[] Data;
     public Socket Socket;
     public String Address;
-    public String Topic;
+    public String Subject;
 
     public ConnectionInfo() {
         Data = new byte[BUFFER_SIZE];
@@ -29,11 +30,11 @@ public class ConnectionInfo {
     }
 
     public String getTopic() {
-        return Topic;
+        return Subject;
     }
 
     public void setTopic(String topic) {
-        Topic = topic;
+        Subject = topic;
     }
 
     public byte[] getData() {

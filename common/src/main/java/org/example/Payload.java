@@ -3,7 +3,7 @@ package org.example;
 import java.io.Serializable;
 
 public class Payload implements Serializable {
-    private String sender;
+    private String subject;
     private String message;
     private final long timestamp;
 
@@ -11,18 +11,18 @@ public class Payload implements Serializable {
         this.timestamp = System.currentTimeMillis();
     }
 
-    public Payload(String sender, String message) {
-        this.sender = sender;
+    public Payload(String subject, String message) {
+        this.subject = subject;
         this.message = message;
         this.timestamp = System.currentTimeMillis();
     }
 
-    public String getSender() {
-        return sender;
+    public String getSubject() {
+        return subject;
     }
 
-    public void setSender(String sender) {
-        this.sender = sender;
+    public void setSubject(String sender) {
+        this.subject = sender;
     }
 
     public String getMessage() {
@@ -39,6 +39,6 @@ public class Payload implements Serializable {
 
     @Override
     public String toString() {
-        return "[" + sender + " @ " + timestamp + "] " + message;
+        return "[" + subject + " @ " + timestamp + "] " + message;
     }
 }
