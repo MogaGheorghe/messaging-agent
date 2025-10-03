@@ -49,7 +49,7 @@ public class SubscriberSocket {
                     new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8),
                     true
             );
-            out.println("subscribe#" + topic); // cu newline
+            out.println("subscribe#" + topic);
             System.out.println("Sent subscribe request for topic: " + topic);
         } catch (IOException e) {
             System.out.println("Could not send subscribe request: " + e.getMessage());
