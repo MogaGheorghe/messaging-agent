@@ -5,8 +5,7 @@ public class BrokerApp {
         System.out.println("BrokerApp started");
         try {
             BrokerSocket broker = new BrokerSocket();
-            broker.Start
-            (Settings.BROKER_IP, Settings.BROKER_PORT, Settings.BROKER_CONNECTIONS_LIMIT);
+            broker.Start(Settings.BROKER_IP, Settings.BROKER_PORT, Settings.BROKER_CONNECTIONS_LIMIT);
 
             Worker worker = new Worker();
 

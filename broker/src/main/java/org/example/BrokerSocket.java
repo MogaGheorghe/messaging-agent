@@ -3,26 +3,39 @@ package org.example;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
-import java.net.*;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Arrays;
+
+import static org.example.Settings.BUFFER_SIZE;
 
 public class BrokerSocket {
-    private final ServerSocket _socket;
-    private final List<ConnectionInfo> connections = new ArrayList<>();
+    private final ServerSocket  _socket;
+    private volatile boolean running = false;
 
-    public BrokerSocket(String ip, int port, int maxConnections) throws IOException {
-        _socket = new ServerSocket(port, maxConnections, InetAddress.getByName(ip));
-        System.out.println("Broker listening on port " + port);
+    public BrokerSocket() throws IOException {
+        _socket = new ServerSocket();
     }
 
-    public void Accept() {
+    public ServerSocket getSocket() {
+        return _socket;
+    }
+
+    public void Start(String ip, int port, int maxConnections) throws IOException {
+        _socket.bind(new InetSocketAddress(ip, port), maxConnections);
+        running = true;
+        System.out.println("Broker listening on port " + port + " \nMax connections " + maxConnections + "\nIP Address " + ip);
+        Accept();
+    }
+
+
+    private void Accept() {
         new Thread(this::AcceptLoop).start();
     }
 
     private void AcceptLoop() {
-        while (true) {
+        while (running && !_socket.isClosed()) {
             try {
                 Socket clientSocket = _socket.accept();
 
@@ -30,72 +43,59 @@ public class BrokerSocket {
                 connection.setSocket(clientSocket);
                 connection.setAddress(clientSocket.getInetAddress().toString());
 
-                synchronized (connections) {
-                    connections.add(connection);
-                }
-
                 System.out.println("Client connected: " + connection.getAddress());
-
                 new Thread(() -> HandleClient(connection)).start();
 
             } catch (IOException e) {
-                System.out.println("Can't accept: " + e.getMessage());
-                break;
+                if (running) {
+                    System.out.println("Can't accept: " + e.getMessage());
+                }
             }
         }
+        System.out.println("Stopped accepting clients.");
+    }
+
+
+    private void onDisconnect(String address) {
+        System.out.println("Client disconnected: " + address);
+        ConnectionsStorage.Remove(address);
+
     }
 
     private void HandleClient(ConnectionInfo connection) {
-        try (BufferedReader in = new BufferedReader(
-                new InputStreamReader(connection.getSocket().getInputStream(), StandardCharsets.UTF_8))) {
+        try {
+            Socket socket = connection.getSocket();
+            InputStream input = socket.getInputStream();
 
-            String line;
-            ObjectMapper mapper = new ObjectMapper();
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int bytesRead;
 
-            while ((line = in.readLine()) != null) {
-                // SUBSCRIBE
-                if (line.startsWith("subscribe#")) {
-                    String topic = line.split("#")[1];
-                    connection.setTopic(topic);
-                    System.out.println("[" + connection.getAddress() + "] subscribed to topic: " + topic);
-                }
-                // PAYLOAD de la Publisher
-                else if (line.startsWith("{")) {
-                    Payload payload = mapper.readValue(line, Payload.class);
-                    System.out.println("[" + connection.getAddress() + "] published: " + payload);
-                    sendToSubscribers(payload);
-                }
+            while ((bytesRead = input.read(buffer)) != -1) {
+                // Copy only the valid bytes
+                byte[] payload = Arrays.copyOf(buffer, bytesRead);
+
+                // Delegate to payload handler
+                PayloadHandler.Handle(payload, connection);
             }
 
-            System.out.println("Client disconnected: " + connection.getAddress());
+
         } catch (IOException e) {
-            System.out.println("Error in HandleClient: " + e.getMessage());
-        }
-    }
-
-    private void sendToSubscribers(Payload payload) {
-        synchronized (connections) {
-            for (ConnectionInfo conn : connections) {
-                if (conn.getTopic() != null && conn.getTopic().equalsIgnoreCase(payload.getSender())) {
-                    try {
-                        PrintWriter out = new PrintWriter(
-                                new OutputStreamWriter(conn.getSocket().getOutputStream(), StandardCharsets.UTF_8),
-                                true
-                        );
-                        out.println(new ObjectMapper().writeValueAsString(payload));
-                        System.out.println("Sent to subscriber [" + conn.getAddress() + "] " + payload);
-                    } catch (IOException e) {
-                        System.out.println("Failed to send to " + conn.getAddress() + ": " + e.getMessage());
-                    }
-                }
-            }
+            System.out.println("Can't receive data: " + e.getMessage());
+        } finally {
+            try {
+                String address = connection.getAddress();
+                onDisconnect(address);
+                connection.getSocket().close();
+            } catch (IOException ignore) {}
         }
     }
 
     public void Close() throws IOException {
-        if (_socket != null && !_socket.isClosed()) {
+        running = false; // signal stop
+        if (_socket.isBound() && !_socket.isClosed()) {
             _socket.close();
-            System.out.println("Broker stopped.");
         }
+        System.out.println("Broker stopped.");
     }
+
 }
